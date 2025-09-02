@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from asyncio.futures import Future
 from rclpy.action import ActionClient
+from rclpy.action.client import ClientGoalHandle
 from my_robot_interfaces.action import CountUntil
 
 
@@ -21,7 +23,20 @@ class CountUntilClientNode(Node):
 
         # send goal
         self.get_logger().info("Sending goal")
-        self.count_until_client_.send_goal_async(goal)
+        self.count_until_client_.send_goal_async(goal).add_done_callback(
+            self.goal_response_callback
+        )
+
+    def goal_response_callback(self, future: Future) -> None:
+        self.goal_handle_: ClientGoalHandle = future.result()
+        if self.goal_handle_.accepted:
+            self.goal_handle_.get_result_async().add_done_callback(
+                self.goal_result_callback
+            )
+
+    def goal_result_callback(self, future: Future) -> None:
+        result = future.result().result
+        self.get_logger().info(f"Result: {result.reached_number}")
 
 
 def main(args=None):
