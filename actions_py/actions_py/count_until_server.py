@@ -8,7 +8,7 @@ from rclpy.action.server import ServerGoalHandle
 from my_robot_interfaces.action import CountUntil
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
-from typing import Optional, cast
+from typing import Optional, cast, List
 from my_robot_interfaces.action._count_until import CountUntil_Goal
 
 
@@ -20,14 +20,30 @@ class CountUntilServerNode(Node):
             CountUntil,
             "count_until",
             goal_callback=self.goal_callback,
+            handle_accepted_callback=self.handle_accepted_callback,
             cancel_callback=self.cancel_callback,
             execute_callback=self.execute_callback,
             callback_group=ReentrantCallbackGroup(),
         )
         self.goal_lock_ = threading.Lock()
         self.current_goal_handle_: Optional[ServerGoalHandle] = None
+        self.goal_queue_: List[ServerGoalHandle] = []
 
         self.get_logger().info("Action server has been started")
+
+    def handle_accepted_callback(self, goal_handle: ServerGoalHandle) -> None:
+        with self.goal_lock_:
+            if self.current_goal_handle_:
+                self.goal_queue_.append(goal_handle)
+            else:
+                goal_handle.execute()
+
+    def process_next_goal_in_queue(self) -> None:
+        with self.goal_lock_:
+            if len(self.goal_queue_) > 0:
+                self.goal_queue_.pop(0).execute()
+            else:
+                self.current_goal_handle_ = None
 
     def goal_callback(self, goal_request: CountUntil.Goal) -> GoalResponse:
         self.get_logger().info("Received a goal")
@@ -45,10 +61,10 @@ class CountUntilServerNode(Node):
             return GoalResponse.REJECT
 
         # Policy: preempt existing goal when receiving new goal
-        with self.goal_lock_:
-            if self.current_goal_handle_ and self.current_goal_handle_.is_active:
-                self.get_logger().info("Aborting current goal and accepting new goal")
-                self.current_goal_handle_.abort()
+        # with self.goal_lock_:
+        #     if self.current_goal_handle_ and self.current_goal_handle_.is_active:
+        #         self.get_logger().info("Aborting current goal and accepting new goal")
+        #         self.current_goal_handle_.abort()
 
         self.get_logger().info("Accepting the goal")
         return GoalResponse.ACCEPT
@@ -76,11 +92,13 @@ class CountUntilServerNode(Node):
         for i in range(target_number):
             if not goal_handle.is_active:
                 result.reached_number = counter
+                self.process_next_goal_in_queue()
                 return result
             if goal_handle.is_cancel_requested:
                 self.get_logger().info("Canceling the goal")
                 goal_handle.canceled()
                 result.reached_number = counter
+                self.process_next_goal_in_queue()
                 return result
             counter += 1
             self.get_logger().info(str(counter))
@@ -93,6 +111,7 @@ class CountUntilServerNode(Node):
         # send result
 
         result.reached_number = counter
+        self.process_next_goal_in_queue()
         return result
 
 
