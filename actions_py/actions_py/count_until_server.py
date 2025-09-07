@@ -32,17 +32,23 @@ class CountUntilServerNode(Node):
     def goal_callback(self, goal_request: CountUntil.Goal) -> GoalResponse:
         self.get_logger().info("Received a goal")
 
+        # Policy: refuse new goal if current goal still active
         # make sure two threads aren't accessing the handle simultaneously
-        with self.goal_lock_:
-            # Policy: refuse new goal if current goal still active
-            if self.current_goal_handle_ and self.current_goal_handle_.is_active:
-                self.get_logger().info("A goal is already active, rejecting new goal")
-                return GoalResponse.REJECT
+        # with self.goal_lock_:
+        #     if self.current_goal_handle_ and self.current_goal_handle_.is_active:
+        #         self.get_logger().info("A goal is already active, rejecting new goal")
+        #         return GoalResponse.REJECT
 
         # validate the goal request
         if goal_request.target_number <= 0:
             self.get_logger().info("Rejecting the goal")
             return GoalResponse.REJECT
+
+        # Policy: preempt existing goal when receiving new goal
+        with self.goal_lock_:
+            if self.current_goal_handle_ and self.current_goal_handle_.is_active:
+                self.get_logger().info("Aborting current goal and accepting new goal")
+                self.current_goal_handle_.abort()
 
         self.get_logger().info("Accepting the goal")
         return GoalResponse.ACCEPT
@@ -68,6 +74,9 @@ class CountUntilServerNode(Node):
         feedback = CountUntil.Feedback()
         result = CountUntil.Result()
         for i in range(target_number):
+            if not goal_handle.is_active:
+                result.reached_number = counter
+                return result
             if goal_handle.is_cancel_requested:
                 self.get_logger().info("Canceling the goal")
                 goal_handle.canceled()
