@@ -8,7 +8,8 @@ from rclpy.action.server import ServerGoalHandle
 from my_robot_interfaces.action import CountUntil
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
-from typing import Optional
+from typing import Optional, cast
+from my_robot_interfaces.action._count_until import CountUntil_Goal
 
 
 class CountUntilServerNode(Node):
@@ -57,8 +58,9 @@ class CountUntilServerNode(Node):
             self.current_goal_handle_ = goal_handle
 
         # get request from goal
-        target_number = goal_handle.request.target_number
-        period = goal_handle.request.period
+        request = cast(CountUntil_Goal, goal_handle.request)
+        target_number = request.target_number
+        period = request.period
 
         # execute the action
         self.get_logger().info("Executing the goal")
