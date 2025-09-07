@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.task import Future
+from rclpy.timer import Timer
 from rclpy.node import Node
 from my_robot_interfaces.action._count_until import (
     CountUntil_GetResult_Response,
@@ -33,12 +34,15 @@ class CountUntilClientNode(Node):
             goal, feedback_callback=self.goal_feedback_callback
         ).add_done_callback(self.goal_response_callback)
 
+        self.timer_: Optional[Timer] = None
+
         # Send a cancel request 2 seconds later
-        self.timer_ = self.create_timer(2.0, self.cancel_goal)
+        # self.timer_ = self.create_timer(2.0, self.cancel_goal)
 
     def cancel_goal(self) -> None:
         self.get_logger().info("Send a cancel request")
-        self.timer_.cancel()
+        if self.timer_:
+            self.timer_.cancel()
         if self.goal_handle_:
             self.goal_handle_.cancel_goal_async()
 
