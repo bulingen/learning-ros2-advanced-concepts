@@ -39,13 +39,15 @@ class CountUntilServerNode(Node):
         # execute the action
         self.get_logger().info("Executing the goal")
         counter = 0
+        feedback = CountUntil.Feedback()
         for i in range(target_number):
             counter += 1
             self.get_logger().info(str(counter))
+            feedback.current_number = counter
+            goal_handle.publish_feedback(feedback)
             time.sleep(period)
 
         # once done, set goal final state
-
         goal_handle.succeed()
 
         # send result
