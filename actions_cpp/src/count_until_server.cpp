@@ -28,21 +28,41 @@ private:
     rclcpp_action::GoalResponse goal_callback(const rclcpp_action::GoalUUID &uuid,
                                               std::shared_ptr<const CountUntil::Goal> goal)
     {
+        (void)uuid;
+        (void)goal;
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
     rclcpp_action::CancelResponse cancel_callback(const std::shared_ptr<CountUntilGoalHandle> goal_handle)
     {
+        (void)goal_handle;
         return rclcpp_action::CancelResponse::ACCEPT;
     }
 
     void handle_accepted_callback(const std::shared_ptr<CountUntilGoalHandle> goal_handle)
     {
+        RCLCPP_INFO(this->get_logger(), "Executing the goal");
         execute_goal(goal_handle);
     }
 
     void execute_goal(const std::shared_ptr<CountUntilGoalHandle> goal_handle)
     {
+        int target_number = goal_handle->get_goal()->target_number;
+        double period = goal_handle->get_goal()->period;
+
+        int counter = 0;
+        rclcpp::Rate loop_rate(1.0 / period);
+        for (int i = 0; i < target_number; i++)
+        {
+            counter++;
+            RCLCPP_INFO(this->get_logger(), "%d", counter);
+            loop_rate.sleep();
+        }
+
+        // set final state and return result
+        auto result = std::make_shared<CountUntil::Result>();
+        result->reached_number = counter;
+        goal_handle->succeed(result);
     }
 };
 
