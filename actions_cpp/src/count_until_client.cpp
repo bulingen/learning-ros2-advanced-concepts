@@ -16,6 +16,7 @@ public:
     void send_goal(int target_number, double period)
     {
         // Wait for action server
+        RCLCPP_INFO(this->get_logger(), "Waiting for server");
         count_until_client_->wait_for_action_server();
 
         // create goal
@@ -39,6 +40,15 @@ private:
     // callback to receive the result once the goal is done
     void goal_result_callback(const CountUntilGoalHandle::WrappedResult &result)
     {
+        auto status = result.code;
+        if (status == rclcpp_action::ResultCode::SUCCEEDED)
+        {
+            RCLCPP_INFO(this->get_logger(), "Succeded");
+        }
+        else if (status == rclcpp_action::ResultCode::ABORTED)
+        {
+            RCLCPP_WARN(this->get_logger(), "Aborted");
+        }
         int reached_number = result.result->reached_number;
         RCLCPP_INFO(this->get_logger(), "Result: %d", reached_number);
     }
